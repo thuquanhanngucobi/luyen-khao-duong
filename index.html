@@ -10,10 +10,18 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="sidebar">
+    <!-- Nút mở Menu trên Điện Thoại -->
+    <div class="mobile-menu-btn" onclick="toggleSidebar()">
+        ☰ Menu Thư Quán
+    </div>
+    
+    <!-- Lớp màng mờ che nội dung khi mở Menu trên điện thoại -->
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <div class="sidebar" id="sidebar">
         <div class="logo">
             <h2>Luyện Khảo Đường</h2>
-            <p>Thư Quán CoBi</p>
+            <p>Thư Quán Hán Ngữ CoBi</p>
         </div>
         <ul class="level-list">
             <li onclick="loadLevel(1)"><span class="icon">🌊</span> HSK 1 - Luyện Khí</li>

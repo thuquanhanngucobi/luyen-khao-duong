@@ -4,6 +4,23 @@ let currentQuizData = [];
 let currentLevelGlobal = "";
 let currentTypeGlobal = "";
 let currentLessonGlobal = "";
+// HÀM ĐÓNG MỞ MENU TRÊN ĐIỆN THOẠI
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('active');
+    // Khi sidebar mở, màng che cũng sẽ hiện nhờ CSS
+}
+// HÀM AI ĐỌC TIẾNG TRUNG TỰ ĐỘNG
+function speakChinese(text) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); // Dừng câu trước đó nếu đang đọc
+        let msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'zh-CN'; // Giọng Trung Quốc chuẩn
+        msg.rate = 0.9; // Tốc độ đọc vừa phải
+        window.speechSynthesis.speak(msg);
+    } else {
+        alert("Trình duyệt của bạn không hỗ trợ âm thanh. Hãy dùng Google Chrome hoặc Safari.");
+    }
+}
 
 async function fetchQuestions() {
     try {
@@ -12,188 +29,217 @@ async function fetchQuestions() {
         allQuestions = rawData.map(row => {
             let cleanRow = {};
             for (let key in row) {
-                let cleanKey = key.trim().toUpperCase();
-                cleanRow[cleanKey] = row[key];
+                cleanRow[key.trim().toUpperCase()] = row[key];
             }
             return cleanRow;
         });
-    } catch (error) {
-        console.error("Lỗi lấy dữ liệu:", error);
-    }
+    } catch (error) { console.error("Lỗi:", error); }
 }
 
 function loadLevel(level) {
+    // Ẩn menu đi nếu đang dùng điện thoại
+    if (window.innerWidth <= 768) {
+        document.getElementById('sidebar').classList.remove('active');
+    }
+    
     document.getElementById('welcome-section').style.display = 'none';
     const container = document.getElementById('quiz-container');
     container.style.display = 'block';
 
-    if (allQuestions.length === 0) {
-        container.innerHTML = '<div class="loading-text">Dữ liệu đang được tải về...</div>';
-        return;
-    }
-
-    const levelQuestions = allQuestions.filter(q => {
-        let capDoSheet = String(q["CẤP ĐỘ"]).replace(/\D/g, ''); 
-        return capDoSheet == level;
-    });
+    // ... (Phần còn lại của hàm loadLevel giữ nguyên)
+    if (allQuestions.length === 0) { container.innerHTML = '<div class="loading-text">Đang kết nối...</div>'; return; }
     
-    if (levelQuestions.length === 0) {
-        container.innerHTML = `<div class="loading-text">Chưa có dữ liệu cho HSK ${level}.</div>`;
-        return;
-    }
+    const levelQuestions = allQuestions.filter(q => String(q["CẤP ĐỘ"]).replace(/\D/g, '') == level);
+    if (levelQuestions.length === 0) { container.innerHTML = `<div class="loading-text">Chưa có dữ liệu.</div>`; return; }
 
     const types = [...new Set(levelQuestions.map(q => q["DẠNG BÀI"]).filter(Boolean))];
-    let html = `<h2 style="text-align: center; font-weight: 600; color: var(--chu-chinh);">HSK ${level} - Chọn dạng bài luyện tập</h2>
-                <div class="type-grid">`;
-    types.forEach(type => {
-        html += `<button class="type-card" onclick="loadType('${level}', '${type}')">${type}</button>`;
-    });
-    html += `</div>`;
-    container.innerHTML = html;
+    let html = `<h2 class="center-title">HSK ${level}</h2><div class="type-grid">`;
+    types.forEach(type => html += `<button class="type-card" onclick="loadType('${level}', '${type}')">${type}</button>`);
+    container.innerHTML = html + `</div>`;
 }
 
 function loadType(level, type) {
-    const container = document.getElementById('quiz-container');
-    const typeQuestions = allQuestions.filter(q => {
-        let capDoSheet = String(q["CẤP ĐỘ"]).replace(/\D/g, ''); 
-        return capDoSheet == level && q["DẠNG BÀI"] === type;
-    });
-
+    const typeQuestions = allQuestions.filter(q => String(q["CẤP ĐỘ"]).replace(/\D/g, '') == level && q["DẠNG BÀI"] === type);
     const lessons = [...new Set(typeQuestions.map(q => q["TÊN BÀI"] || "Bài tập chung").filter(Boolean))];
-
-    let html = `<div style="display:flex; justify-content: space-between; align-items:center; border-bottom: 2px dashed var(--vien-co); padding-bottom: 15px; margin-bottom: 20px;">
-                    <h2 style="font-weight: 600; color: var(--chu-chinh);">${type}</h2>
-                    <button onclick="loadLevel('${level}')" class="btn-submit" style="padding: 8px 15px; font-size:15px;">⬅ Quay lại</button>
-                </div>
-                <div class="type-grid">`;
-    lessons.forEach(lesson => {
-        html += `<button class="type-card" onclick="loadQuiz('${level}', '${type}', '${lesson}')">${lesson}</button>`;
-    });
-    html += `</div>`;
-    container.innerHTML = html;
+    
+    let html = `<div style="display:flex; justify-content: space-between; margin-bottom: 20px;">
+                    <h2 class="center-title">${type}</h2>
+                    <button onclick="loadLevel('${level}')" class="btn-submit" style="padding: 5px 15px;">⬅ Quay lại</button>
+                </div><div class="type-grid">`;
+    lessons.forEach(lesson => html += `<button class="type-card" onclick="loadQuiz('${level}', '${type}', '${lesson}')">${lesson}</button>`);
+    document.getElementById('quiz-container').innerHTML = html + `</div>`;
 }
 
 function loadQuiz(level, type, lesson) {
-    currentLevelGlobal = level;
-    currentTypeGlobal = type;
-    currentLessonGlobal = lesson;
+    currentLevelGlobal = level; currentTypeGlobal = type; currentLessonGlobal = lesson;
     const container = document.getElementById('quiz-container');
-    
-    currentQuizData = allQuestions.filter(q => {
-        let capDoSheet = String(q["CẤP ĐỘ"]).replace(/\D/g, ''); 
-        let tenBaiSheet = q["TÊN BÀI"] || "Bài tập chung";
-        return capDoSheet == level && q["DẠNG BÀI"] === type && tenBaiSheet === lesson;
-    });
+    currentQuizData = allQuestions.filter(q => String(q["CẤP ĐỘ"]).replace(/\D/g, '') == level && q["DẠNG BÀI"] === type && (q["TÊN BÀI"] || "Bài tập chung") === lesson);
 
-    let html = `<div style="display:flex; justify-content: space-between; align-items:center; border-bottom: 2px dashed var(--vien-co); padding-bottom: 15px; margin-bottom: 30px;">
-                    <h2 style="font-weight: 600; color: var(--thuy-chinh);">${lesson}</h2>
-                    <button onclick="loadType('${level}', '${type}')" class="btn-submit" style="padding: 8px 15px; font-size:15px;">⬅ Chọn bài khác</button>
+    let html = `<div style="display:flex; justify-content: space-between; margin-bottom: 20px;">
+                    <h2 style="color: var(--thuy-chinh); font-weight: bold;">${lesson}</h2>
+                    <button onclick="loadType('${level}', '${type}')" class="btn-submit" style="padding: 5px 15px;">⬅ Trở lại</button>
                 </div>`;
     
+    let lastPassage = "";
+    
+    // Nếu là dạng NỐI, ta render kiểu Dropdown để đơn giản hóa giao diện học viên trên cả máy tính lẫn điện thoại
+    let isMatching = type.toLowerCase().includes("nối");
+    let rightColumnAnswers = [];
+    if (isMatching) {
+        rightColumnAnswers = currentQuizData.map(q => q["ĐÁP ÁN"]).sort(() => Math.random() - 0.5); // Xáo trộn vế phải
+    }
+
     currentQuizData.forEach((q, index) => {
+        // Xử lý Đoạn văn chung & Ảnh chung
+        let currentPassage = q["ĐOẠN VĂN CHUNG"] ? String(q["ĐOẠN VĂN CHUNG"]).trim() : "";
+        if (currentPassage !== "" && currentPassage !== lastPassage) {
+            html += `<div class="passage-box"><div class="passage-label">📖 Nội dung:</div><div class="passage-text">${currentPassage.replace(/\n/g, '<br>')}</div></div>`;
+            lastPassage = currentPassage;
+        }
+        
+        let mediaHtml = q["MEDIA"] ? `<img src="${q["MEDIA"]}" class="question-image" alt="Hình ảnh bài tập">` : "";
+        let cauHoiText = q["CÂU HỎI"] ? String(q["CÂU HỎI"]).trim() : "";
+        let hasOptions = q["A"] || q["B"] || q["C"] || q["D"];
+        let isAudioType = type.toLowerCase().includes("nghe");
+        
         let questionContent = '';
-        if (type.includes("Sắp xếp câu") || type.includes("Điền từ") || type.includes("Đặt câu")) {
-            let words = q["CÂU HỎI"].split('/');
-            let wordSpans = words.map(w => `<span class="word-chip">${w.trim()}</span>`).join('');
+
+        if (isMatching) {
+            // DẠNG 3 & 5: NỐI (Hiển thị Vế trái và Dropdown chọn Vế phải)
             questionContent = `
-                <div class="words-container">${wordSpans}</div>
-                <input type="text" id="ans_${index}" class="answer-input" placeholder="Viết đáp án của bạn vào đây...">
+                <div style="display:flex; align-items:center; gap: 15px;">
+                    <button class="btn-audio" onclick="speakChinese('${cauHoiText}')">🔊 Nghe</button>
+                    <span class="chinese-text">${cauHoiText}</span>
+                </div>
+                <select id="ans_${index}" class="match-select">
+                    <option value="">-- Chọn đáp án để ghép nối --</option>
+                    ${rightColumnAnswers.map(ans => `<option value="${ans}">${ans}</option>`).join('')}
+                </select>
             `;
-        } else {
-            questionContent = `
-                <p class="chinese-text" style="margin-bottom: 15px;">${q["CÂU HỎI"]}</p>
-                <ul style="list-style: none;">
-                    <li style="padding: 8px 0; font-family: 'Noto Serif SC', serif;"><input type="radio" name="ans_${index}" value="A"> A. ${q["A"] || ""}</li>
-                    <li style="padding: 8px 0; font-family: 'Noto Serif SC', serif;"><input type="radio" name="ans_${index}" value="B"> B. ${q["B"] || ""}</li>
-                    <li style="padding: 8px 0; font-family: 'Noto Serif SC', serif;"><input type="radio" name="ans_${index}" value="C"> C. ${q["C"] || ""}</li>
-                    <li style="padding: 8px 0; font-family: 'Noto Serif SC', serif;"><input type="radio" name="ans_${index}" value="D"> D. ${q["D"] || ""}</li>
-                </ul>
+        } 
+        else if (isAudioType) {
+            // DẠNG 1, 2, 6: NGHE (Ẩn text câu hỏi, chỉ hiện loa)
+            questionContent = `${mediaHtml}
+                <div style="margin-bottom: 15px;">
+                    <button class="btn-audio" onclick="speakChinese('${cauHoiText}')">🔊 Bấm để nghe câu hỏi</button>
+                </div>
             `;
+            if (hasOptions) {
+                questionContent += `<ul style="list-style: none;">`;
+                ['A', 'B', 'C', 'D'].forEach(opt => {
+                    if (q[opt]) questionContent += `<li class="mcq-option"><input type="radio" name="ans_${index}" value="${opt}"> ${opt}. ${q[opt]}</li>`;
+                });
+                questionContent += `</ul>`;
+            } else {
+                questionContent += `<input type="text" id="ans_${index}" class="answer-input" placeholder="Nghe và gõ đáp án vào đây...">`;
+            }
+        } 
+        else if (type.toLowerCase().includes("đặt câu")) {
+            // DẠNG 4: NHÌN TRANH ĐẶT CÂU (Tự luận hoàn toàn)
+            questionContent = `${mediaHtml}
+                <p class="chinese-text">${cauHoiText}</p>
+                <textarea id="ans_${index}" class="answer-input" rows="3" placeholder="Viết câu của bạn vào đây..."></textarea>
+            `;
+        } 
+        else {
+            // CÁC DẠNG BÌNH THƯỜNG (Điền từ, trắc nghiệm)
+            questionContent = mediaHtml;
+            if (!hasOptions) {
+                let words = cauHoiText.split('/');
+                questionContent += words.length > 1 
+                    ? `<div class="words-container">${words.map(w => `<span class="word-chip">${w.trim()}</span>`).join('')}</div>`
+                    : `<p class="chinese-text" style="margin-bottom: 15px;">${cauHoiText}</p>`;
+                questionContent += `<input type="text" id="ans_${index}" class="answer-input" placeholder="Viết đáp án...">`;
+            } else {
+                questionContent += `<p class="chinese-text" style="margin-bottom: 15px;">${cauHoiText}</p><ul style="list-style: none;">`;
+                ['A', 'B', 'C', 'D'].forEach(opt => {
+                    if (q[opt]) questionContent += `<li class="mcq-option"><input type="radio" name="ans_${index}" value="${opt}"> ${opt}. ${q[opt]}</li>`;
+                });
+                questionContent += `</ul>`;
+            }
         }
 
-        html += `
-            <div class="question-block" id="block_${index}">
-                <h4 style="margin-bottom: 15px;">Câu ${index + 1}:</h4>
-                ${questionContent}
-                <div id="result_${index}" class="result-box"></div>
-            </div>
-        `;
+        html += `<div class="question-block" id="block_${index}"><h4 style="margin-bottom: 15px; color: var(--thuy-chinh);">Câu ${index + 1}:</h4>${questionContent}<div id="result_${index}" class="result-box"></div></div>`;
     });
 
-    html += `
-        <div style="background: rgba(255,255,255,0.6); padding: 20px; border-radius: 8px; text-align: center; margin-top: 40px; border: 1px dashed var(--vien-co);">
-            <h4 style="margin-bottom: 15px; color: var(--chu-chinh);">Xác nhận nộp bài</h4>
-            <input type="text" id="studentName" placeholder="Nhập tên của bạn..." style="padding: 10px; font-size: 16px; border: 1px solid var(--vien-co); border-radius: 4px; width: 60%; margin-bottom: 15px; outline: none;"><br>
-            <button class="btn-submit" onclick="submitQuiz()" id="submitBtn">Hoàn tất Khảo thí</button>
-            <div id="loading-submit" style="display:none; color: var(--thuy-chinh); margin-top:10px; font-style:italic;">Đang truyền thư báo điểm về Thư Quán...</div>
-        </div>
-    `;
+    html += `<div style="background: rgba(255,255,255,0.8); padding: 20px; border-radius: 8px; text-align: center; border: 1px dashed var(--vien-co);">
+                <h4>Xác nhận nộp bài</h4>
+                <input type="text" id="studentName" placeholder="Nhập tên..." style="padding:10px; width:60%; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"><br>
+                <button class="btn-submit" onclick="submitQuiz()" id="submitBtn">Nộp bài</button>
+                <div id="loading-submit" style="display:none; color: var(--thuy-chinh); margin-top:10px;">Đang gửi kết quả...</div>
+            </div>`;
     container.innerHTML = html;
 }
 
 async function submitQuiz() {
     const studentName = document.getElementById('studentName').value.trim();
-    if (!studentName) { alert("Vui lòng lưu danh tính (nhập tên) trước khi nộp bài!"); return; }
+    if (!studentName) { alert("Vui lòng nhập tên!"); return; }
 
     document.getElementById('submitBtn').style.display = 'none';
     document.getElementById('loading-submit').style.display = 'block';
 
     let score = 0;
-    let total = currentQuizData.length;
-    let wrongDetails = []; // Mảng chứa chi tiết câu sai gửi về sheet
+    let total = 0; // Đếm số câu có chấm điểm
+    let wrongDetails = []; 
 
     currentQuizData.forEach((q, index) => {
-        let isCorrect = false;
         let userAnswer = "";
-        let correctAnswer = String(q["ĐÁP ÁN"]).trim();
+        let correctAnswer = String(q["ĐÁP ÁN"] || "").trim();
+        let isMatching = currentTypeGlobal.toLowerCase().includes("nối");
+        let isWriting = currentTypeGlobal.toLowerCase().includes("đặt câu");
+        let hasOptions = q["A"] || q["B"] || q["C"] || q["D"];
+        let resultBox = document.getElementById(`result_${index}`);
 
-        if (currentTypeGlobal.includes("Sắp xếp câu") || currentTypeGlobal.includes("Điền từ") || currentTypeGlobal.includes("Đặt câu")) {
+        // Lấy đáp án của HS
+        if (isMatching || !hasOptions) {
             let inputEl = document.getElementById(`ans_${index}`);
             userAnswer = inputEl ? inputEl.value.trim() : "";
-            if (userAnswer.replace(/\s+/g, '') === correctAnswer.replace(/\s+/g, '')) {
-                isCorrect = true;
-            }
         } else {
             let selectedRadio = document.querySelector(`input[name="ans_${index}"]:checked`);
             userAnswer = selectedRadio ? selectedRadio.value : "";
-            if (userAnswer.toUpperCase() === correctAnswer.toUpperCase()) {
-                isCorrect = true;
-            }
         }
 
-        let resultBox = document.getElementById(`result_${index}`);
-        
-        if (isCorrect) {
-            score++;
-            resultBox.innerHTML = `✅ Tuyệt vời! Bạn đã làm đúng.`;
+        // Xử lý Chấm Điểm
+        if (isWriting) {
+            // Dạng Tự luận Đặt câu: KHÔNG CHẤM ĐÚNG SAI
+            resultBox.innerHTML = `⏳ Câu này đang chờ Giáo viên chấm. <br>Bài làm của bạn: <b>${userAnswer}</b>`;
             resultBox.className = "result-box correct";
-        } else {
-            // Hiển thị ra web cho học sinh xem
-            let displayAnswer = userAnswer === "" ? "Chưa làm" : userAnswer;
-            resultBox.innerHTML = `❌ Đáp án của bạn: <b>${displayAnswer}</b><br>👉 Đáp án chính xác: <b>${correctAnswer}</b>`;
-            resultBox.className = "result-box incorrect";
+            resultBox.style.background = "#fff3e0"; // Màu cam nhạt
+            resultBox.style.color = "#e65100";
             
-            // Xử lý logic gộp chữ gửi về Google Sheet đúng ý bạn
-            if (userAnswer === "") {
-                wrongDetails.push(`Câu ${index + 1}: chưa làm (${correctAnswer})`);
+            wrongDetails.push(`Câu ${index + 1} [HS Tự luận]: ${userAnswer === "" ? "Bỏ trống" : userAnswer}`);
+        } 
+        else {
+            total++; // Tính vào tổng số câu
+            let isCorrect = (userAnswer.replace(/\s+/g, '').toUpperCase() === correctAnswer.replace(/\s+/g, '').toUpperCase());
+
+            if (isCorrect) {
+                score++;
+                resultBox.innerHTML = `✅ Tuyệt vời! Bạn đã làm đúng.`;
+                resultBox.className = "result-box correct";
             } else {
-                wrongDetails.push(`Câu ${index + 1}: ${userAnswer} (${correctAnswer})`);
+                let displayAnswer = userAnswer === "" ? "chưa làm" : userAnswer;
+                resultBox.innerHTML = `❌ Đáp án của bạn: <b>${displayAnswer}</b><br>👉 Đáp án chính xác: <b>${correctAnswer}</b>`;
+                resultBox.className = "result-box incorrect";
+                
+                wrongDetails.push(`Câu ${index + 1}: ${displayAnswer} (${correctAnswer})`);
             }
         }
     });
 
+    let displayScore = total > 0 ? `${score}/${total}` : "Chờ chấm tự luận";
     const payload = {
         tenHocVien: studentName,
         capDo: `HSK ${currentLevelGlobal} | ${currentTypeGlobal} | ${currentLessonGlobal}`,
-        diemSo: `${score}/${total}`,
+        diemSo: displayScore,
         chiTiet: wrongDetails.length > 0 ? wrongDetails.join("\n") : ""
     };
 
     try {
         await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-        document.getElementById('loading-submit').innerHTML = `<b>🎉 Đã nộp bài! Bạn đạt ${score}/${total} điểm.</b>`;
+        document.getElementById('loading-submit').innerHTML = `<b>🎉 Đã nộp bài! Kết quả: ${displayScore}</b>`;
     } catch (error) {
-        document.getElementById('loading-submit').innerHTML = `⚠️ Lỗi mạng: Chưa thể lưu lên hệ thống.`;
+        document.getElementById('loading-submit').innerHTML = `⚠️ Lỗi mạng.`;
     }
 }
 
